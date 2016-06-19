@@ -1,0 +1,96 @@
+<script src='https://code.jquery.com/jquery-3.0.0.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/web-socket-js/1.0.0/web_socket.min.js'></script>
+
+<script src='https://cdnjs.cloudflare.com/ajax/libs/highcharts/4.2.5/highcharts.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/highcharts/4.2.5/modules/treemap.js'></script>
+<script src="https://code.highcharts.com/modules/heatmap.js"></script>
+
+<div id='container'>container</div>
+<div id='status'>status</div>
+<div id='part2'>part2</div>
+
+<script type='text/javascript'>
+$(function(){               
+    chart= $('#container').highcharts({ 
+        chart: {
+            type: 'bar'
+        },
+        series: [{
+            data: [1,2,3]
+        }]
+    });
+
+    $("#status").html("not connected");
+
+    var wsUriC="ws://localhost:1880/ws";
+    var chart=$(chart).highcharts();
+    var series=chart.series[0];
+
+    //setTimeout(function(){
+        wsConnectC(series, wsUriC);
+    //},3000);
+
+     function addPoint(series, y) {
+        series.addPoint(y,true,true);
+    }
+
+    function wsConnectC(series, wsUriC) {
+        console.log("connect",wsUriC);
+        ws = new WebSocket(wsUriC);
+
+        ws.onmessage = function(msg) {
+            console.log('msg',msg);		
+
+            var line = "";
+            //var value=parseInt(msg.data/1000);
+            //series.addPoint(value);
+            var data=msg.data;
+
+            console.log('data',typeof data);
+            var obj=JSON.parse(data);
+            if (obj.action) {
+                switch(obj.action){  
+                    case 'add_chart':
+                        add_chart(obj);
+                        break;                 
+                    default:
+                        chart.addSeries(obj.data);
+                        break;
+                }
+            }
+            else process_other(series, obj)
+        }
+
+        function add_chart(obj){
+            $('<div id="'+obj.chart_name+'"/>').prependTo($('body'));
+            console.log('chart data',obj.data)
+
+            $('#'+obj.chart_name).highcharts({
+                chart:{
+                    type:obj.chart_type||'line'                    
+                },
+                title:{text:obj.chart_name},
+                series:[obj.series]
+            })
+        }
+
+        function process_other(series, obj) {
+            obj.map(function(e){
+                addPoint(series, e.wip);
+            });
+
+            $("#part2").html(obj);
+        }
+
+        ws.onopen = function() {
+            $("#status").html("connected");
+            console.log("connected");
+        }
+
+        ws.onclose = function() {
+            $("#status").html("not connected");
+            setTimeout(wsConnectC,1000);
+        }
+    }
+});
+</script>
